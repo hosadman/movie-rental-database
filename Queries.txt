@@ -1,0 +1,108 @@
+Question 1- Which family-friendly category was the most popular amongst customers? Which category was rented the least?
+
+/* Query 1- Rental order counts of movies included in all the family-friendly categories. Family-friendly 
+categories include 'Animation', 'Children', 'Classics', 'Comedy','Family' & 'Music' */
+
+WITH t1 AS (
+SELECT f.title AS film_title,
+c.name AS category_name,
+i.inventory_id
+FROM film f 
+JOIN film_category fc
+ON f.film_id = fc.film_id
+JOIN category c
+ON fc.category_id = c.category_id
+JOIN inventory i
+ON f.film_id = i.film_id
+WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+)
+
+SELECT t1.film_title AS film,
+t1.category_name AS category_name,
+COUNT(r.*) AS rental_count
+FROM t1
+JOIN rental r
+ON t1.inventory_id = r.inventory_id
+GROUP BY 1,2
+ORDER BY 2,1
+
+(For the data visualization, I only decided to show the rental counts for the film categories.
+So, for that, the revised main query will be as follows)
+
+SELECT t1.category_name AS category_name,
+COUNT(r.*) AS rental_count
+FROM t1
+JOIN rental r
+ON t1.inventory_id = r.inventory_id
+GROUP BY 1
+ORDER BY 2 DESC
+
+
+Question 2- What are the rental order count distributions based on the categories and the rental duration quartiles?
+
+/* Query 2- Rental order counts of all the family-friendly film categories, with their corresponding quartiles
+based on their respective rental duration periods */
+
+WITH t1 AS (
+SELECT c.name AS name,
+f.rental_duration AS rd,
+NTILE(4) OVER (ORDER BY f.rental_duration) AS standard_quartile
+FROM film f
+JOIN film_category fc
+ON f.film_id = fc.film_id
+JOIN category c
+ON fc.category_id = c.category_id
+WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+ORDER BY 3
+)
+
+SELECT t1.name AS name,
+t1.standard_quartile AS standard_quartile,
+COUNT(t1.*) AS count_rentals
+FROM t1
+GROUP BY 1,2
+ORDER BY 1,2
+
+
+Question 3- What’s the difference in the monthly movie rental order counts based on the different store branches? What are the monthly 
+average rental order counts?
+
+/* Query 3- Monthly rental order counts based on the different store branches */
+
+SELECT DATE_PART('month', r.rental_date) AS month,
+DATE_PART('year', r.rental_date) AS year,
+s.store_id as stores,
+COUNT(DISTINCT(r.rental_id)) AS count_rentals
+FROM rental r
+JOIN staff st
+ON r.staff_id = st.staff_id
+JOIN store s
+ON st.store_id = s.store_id
+GROUP BY 1,2,3
+ORDER BY 4 DESC
+
+Question 4- What was the monthly payment distribution for the top 5 spending customers in a particular year?
+
+/* Query 4- Monthly spending amounts of the top 5 customers in a particular year */
+
+WITH t1 AS (
+SELECT c.first_name || ' ' || c.last_name AS full_name, SUM(p.amount) as amount_total
+FROM customer c
+JOIN payment p
+ON p.customer_id = c.customer_id
+WHERE p.payment_date BETWEEN '2007-01-01' AND '2008-01-01'
+GROUP BY 1	
+ORDER BY 2 DESC
+LIMIT 5
+)
+SELECT DATE_TRUNC('month', p.payment_date) pay_month, c.first_name || ' ' || c.last_name AS full_name, COUNT(p.amount) AS payment_count, 
+SUM(p.amount) AS pay_amount
+FROM customer c
+JOIN payment p
+ON p.customer_id = c.customer_id
+WHERE c.first_name || ' ' || c.last_name IN
+(SELECT t1.full_name
+FROM t1)
+GROUP BY 2, 1
+ORDER BY 2, 1, 3
+
